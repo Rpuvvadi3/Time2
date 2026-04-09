@@ -1,0 +1,14 @@
+pages:
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build          
+    - cd ..
+    - if (Test-Path "public") { Remove-Item -Recurse -Force "public" }
+    - Move-Item -Force "frontend/dist" "public"
+    - Copy-Item -Force "public/index.html" "public/404.html"
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "temp"'

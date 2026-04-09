@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # This value gets baked into the frontend bundle at build time
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8081/api}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    healthcheck:
+      test: ["CMD","wget","--spider","-q","http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-planner}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SERVER_PORT: 8080
+      # Keep this in sync with your frontend dev origin(s)
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD","wget","--spider","-q","http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  db:
+    image: postgres:16-alpine
+    container_name: planner_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-planner}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"                     # optional: expose to host tools
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-planner}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
